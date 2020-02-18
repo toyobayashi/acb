@@ -6,7 +6,10 @@
 #include <wchar.h>
 #include <direct.h>
 #include <io.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #else
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #endif // _WIN32
@@ -48,11 +51,22 @@ static int mkdirs(const char* path) {
       *(wpath + i) = L'\\';
     }
   }
-  if (len > 0 && _waccess(wpath, 0) != 0) {
-    code = _wmkdir(wpath);
+
+  if (len > 0) {
+    struct _stat s;
+    _wstat(wpath, &s);
+    if (s.st_mode & S_IFDIR) {
+      free(wpath);
+      return 0;
+    } else {
+      code = _wmkdir(wpath);
+      free(wpath);
+      return code;
+    }
+  } else {
+    free(wpath);
+    return 1;
   }
-  free(wpath);
-  return code;
 #else
   size_t i, len;
   int code;
@@ -72,10 +86,19 @@ static int mkdirs(const char* path) {
       str[i] = '/';
     }
   }
-  if (len > 0 && access(str, 0) != 0) {
-    code = mkdir(str, 0777);
+
+  if (len > 0) {
+    struct stat s;
+    stat(str, &s);
+    if (S_ISDIR(s.st_mode)) {
+      return 0;
+    } else {
+      code = mkdir(str, 0777);
+      return code;
+    }
+  } else {
+    return 1;
   }
-  return code;
 #endif
 }
 
